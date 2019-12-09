@@ -2,7 +2,7 @@ WIP
 
 # GCSFfmpeg
 
-Inspired by [Goffmpeg]((https://github.com/xfrr/goffmpeg)) package
+Inspired by [Goffmpeg](https://github.com/xfrr/goffmpeg) package
 
 # Dependencies
 - [FFmpeg](https://www.ffmpeg.org/)
@@ -21,13 +21,15 @@ Inspired by [Goffmpeg]((https://github.com/xfrr/goffmpeg)) package
 go get github.com/Nks/go-gcs-ffmpeg
 ```
 
+or run
+
+```shell
+./gcs-transcoder -source=test/example.mp4 -output=test/stream -storage=your-bucket-name
+```
+
 # Examples
 
 Check `main.go` for the examples.
-
-# Parameters
-
-`-source=test/example.mp4 -output=streams -storage=wmt-video-test`
 
 # FAQ
 
@@ -53,10 +55,9 @@ Create cors.json file:
 ]
 ```
 
-Run following command:
-`gsutil cors set cors.json gs://your-gcs-bucket`
+Run command: `gsutil cors set cors.json gs://your-gcs-bucket`
 
-1. Why HLS files downloading instead of playing?
+2. Why HLS files downloading instead of playing?
 
-Check Content-Type for your files. You should set content type for the m3u8 and ts files. .m3u8 files should be `application/vnd.apple.mpegurl` and .ts files should be `video/mp2t`
+- Check Content-Type for your files. You should set content type for the m3u8 and ts files. .m3u8 files should be `application/vnd.apple.mpegurl` and .ts files should be `video/mp2t`
 
