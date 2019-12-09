@@ -74,28 +74,43 @@ func (gcs *GcsClient) UploadStreamToGcs(tempPath string, parameters *models.Para
 		return fmt.Errorf("unable list stream path with error %v", err)
 	}
 
+	done := make(chan struct{})
+	count := uint64(0)
+
 	for _, file := range files {
-		var r io.Reader
-		f, err := os.Open(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-		r = f
+		count += 1
 
-		name := strings.Replace(file, tempPath, "", -1)
+		go func(file string) {
+			defer func() { done <- struct{}{} }()
 
-		ctx := context.Background()
-		obj, err := upload(ctx, r, bucket, name, public)
-		if err != nil {
-			switch err {
-			case storage.ErrBucketNotExist:
-				log.Fatal("Please create the bucket first e.g. with `gsutil mb`")
-			default:
+			var r io.Reader
+			f, err := os.Open(file)
+			if err != nil {
 				log.Fatal(err)
 			}
-		}
+			r = f
 
-		fmt.Println(file, "uploaded", obj.ObjectName())
+			name := strings.Replace(file, tempPath, parameters.Output, -1)
+
+			ctx := context.Background()
+			_, err = upload(ctx, r, bucket, name, public)
+
+			if err != nil {
+				switch err {
+				case storage.ErrBucketNotExist:
+					log.Fatal("Please create the bucket first e.g. with `gsutil mb`")
+				default:
+					log.Fatal(err)
+				}
+			} else {
+				log.Println("File uploaded:", name)
+			}
+
+		}(file)
+	}
+
+	for i := uint64(0); i < count; i++ {
+		<-done
 	}
 
 	return nil
@@ -112,7 +127,6 @@ func scanFolder(files *[]string) filepath.WalkFunc {
 		}
 
 		if info.IsDir() {
-			log.Println("Skipping dir", path)
 			return nil
 		}
 
@@ -145,6 +159,29 @@ func upload(ctx context.Context, r io.Reader, bucket, name string, public bool) 
 	if public {
 		if err := obj.ACL().Set(ctx, storage.AllUsers, storage.RoleReader); err != nil {
 			return nil, err
+		}
+	}
+
+	extension := filepath.Ext(name)
+	var contentType string
+
+	switch extension {
+	case ".m3u8", ".m3u":
+		contentType = "application/vnd.apple.mpegurl"
+	case ".ts", ".tsa", ".tsv":
+		contentType = "video/mp2t"
+	default:
+		contentType = ""
+	}
+
+	if contentType != "" {
+		objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
+			ContentType:  contentType,
+			CacheControl: "private, max-age=21296", //youtube's cache control
+		}
+
+		if _, err := obj.Update(ctx, objectAttrsToUpdate); err != nil {
+			return obj, err
 		}
 	}
 
